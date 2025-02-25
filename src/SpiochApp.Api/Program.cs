@@ -1,8 +1,14 @@
+using Microsoft.AspNetCore.Mvc;
+using SpiochApp.Api.model.commands;
+using SpiochApp.Api.model.responses;
+using SpiochApp.Api.services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddTransient<ISleepScheduleCalculator, SleepScheduleCalculator>();
 
 var app = builder.Build();
 
@@ -10,32 +16,29 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "SpiochApp.Api v1");
+    });
 }
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+app.MapPost("/calculate", (GetSleepSchedule request, [FromServices] ISleepScheduleCalculator sleepScheduleCalculator) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
+    
+    List<SleepSpanDto> sleepScheduleResult;
+    try
     {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast");
+        sleepScheduleResult = sleepScheduleCalculator.Calculate(request);
+    } catch (Exception e)
+    {
+        return Results.BadRequest("Sprawdź poprawność danych i spróbuj jeszcze raz");
+    }
+
+    return Results.Ok(sleepScheduleResult);
+});
+
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
