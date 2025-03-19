@@ -1,0 +1,110 @@
+@page "/spiochapp"
+@rendermode InteractiveServer
+
+<div class="d-flex gap-3 mb-2">
+    <h3>SpiochApp</h3>
+    <button class="btn btn-primary" @onclick="AddPerson">Dodaj osobę</button>
+</div>
+
+@foreach(var person in _people)
+{
+    <div class="d-flex gap-3 mb-1">
+        <input type="text" class="form-control" id="name" placeholder="Wprowadź imię" @bind="person.Name" />
+        <button @onclick="() => RemovePerson(person)" class="btn btn-danger">Usuń</button>
+    </div>
+}
+
+<label>Czas startowy: </label>
+<input type="time" @bind="_startTime" />
+
+<label>Czas końcowy: </label>
+<input type="time" @bind="_endTime" />
+
+<button @onclick="CalculateSleepSchedule" class="btn btn-success mt-2">Rozpocznij dyżur</button>
+
+@if (_sleepSchedule.Any())
+{
+    <h4>Harmonogram czuwania:</h4>
+    <ul>
+        @foreach (var entry in _sleepSchedule)
+        {
+            <li>@entry.PersonName czuwa od @entry.StartTime do @entry.EndTime (Czas trwania: @entry.SleepDuration)</li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Person> _people = [];
+    private List<SleepScheduleEntry> _sleepSchedule = new List<SleepScheduleEntry>();
+    
+    private DateTime _startTime { get; set; } = DateTime.Now;
+    private DateTime _endTime { get; set; } = DateTime.Now.AddHours(8);
+    
+    private void AddPerson()
+    {
+        _people.Add(new Person());
+    }
+    
+    private void RemovePerson(Person person)
+    {
+        _people.Remove(person);
+    }
+
+    private class Person
+    {
+        public string Name { get; set; } = "";
+    }
+    
+    private void CalculateSleepSchedule()
+    {
+        _sleepSchedule.Clear(); // Clear previous schedule
+        
+        _people = _people.Where(p => p.Name != "").ToList();
+        
+        if (_people.Count < 1)
+        {
+            // Inform the user that there should be at least one person
+            return;
+        }
+
+        var startTime = _startTime;
+        var endTime = _endTime;
+        
+        if (endTime < startTime)
+        {
+            // If end time is before start time, add a day to end time
+            endTime = endTime.AddDays(1);
+        }
+        
+        var totalDuration = endTime - startTime;
+
+        // Divide total time equally among people
+        var sleepDuration = totalDuration / _people.Count;
+        sleepDuration = new TimeSpan(sleepDuration.Hours, sleepDuration.Minutes, sleepDuration.Seconds);
+        var currentStart = startTime;
+
+        foreach (var person in _people)
+        {
+            var sleepEnd = currentStart + sleepDuration;
+            _sleepSchedule.Add(new SleepScheduleEntry
+            {
+                PersonName = person.Name,
+                StartTime = currentStart.ToString("HH:mm"),
+                EndTime = sleepEnd.ToString("HH:mm"),
+                SleepDuration = sleepDuration
+            });
+
+            // Move to the next start time
+            currentStart = sleepEnd;
+        }
+    }
+    
+    private class SleepScheduleEntry
+    {
+        public string PersonName { get; set; }
+        public string StartTime { get; set; }
+        public string EndTime { get; set; }
+        public TimeSpan SleepDuration { get; set; }
+    }
+}
+
